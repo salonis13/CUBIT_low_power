@@ -1,0 +1,19 @@
+/*
+ * imu.h
+ *
+ *  Created on: Feb 23, 2022
+ *      Author: rajat
+ */
+
+#ifndef SRC_IMU_H_
+#define SRC_IMU_H_
+
+
+#define CMD_CHIP_ID 0x00
+#define CMD_OPR_MODE 0x3D
+#define MAG_DATA_Z_LSB 0x12
+#define ACC_DATA_X_LSB 0x08
+
+void init_imu();
+
+#endif /* SRC_IMU_H_ */

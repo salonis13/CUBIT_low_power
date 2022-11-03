@@ -1,0 +1,18 @@
+/*
+ * imu.c
+ *
+ *  Created on: Feb 23, 2022
+ *      Author: rajat
+ */
+
+
+#include "i2c.h"
+#include "imu.h"
+
+#define SENSOR_IMU_ADDRESS 0x29 // Proximity sensor adrress 0010 1001
+
+
+void init_imu()
+{
+  i2c_write(SENSOR_IMU_ADDRESS, CMD_CHIP_ID);
+}

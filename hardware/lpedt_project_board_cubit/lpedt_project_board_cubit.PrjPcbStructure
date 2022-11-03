@@ -1,0 +1,8 @@
+Record=TopLevelDocument|FileName=Block_Diagram.SchDoc|SheetNumber=1
+Record=NoMainPathDocument|SourceDocument=Block_Diagram.SchDoc|FileName=efr32_ioport.SchDoc|SheetNumber=3
+Record=NoMainPathDocument|SourceDocument=Block_Diagram.SchDoc|FileName=efr32_lcd_hmi.SchDoc|SheetNumber=2
+Record=NoMainPathDocument|SourceDocument=Block_Diagram.SchDoc|FileName=efr32_radio_interface.SchDoc|SheetNumber=4
+Record=NoMainPathDocument|SourceDocument=Block_Diagram.SchDoc|FileName=Mag_Enc_Sensors.SchDoc|SheetNumber=6
+Record=NoMainPathDocument|SourceDocument=Block_Diagram.SchDoc|FileName=power_management.SchDoc|SheetNumber=5
+Record=NoMainPathDocument|SourceDocument=Block_Diagram.SchDoc|FileName=solar_cell.SchDoc|SheetNumber=8
+Record=NoMainPathDocument|SourceDocument=Block_Diagram.SchDoc|FileName=ultrasonic_imu_sensor.SchDoc|SheetNumber=7

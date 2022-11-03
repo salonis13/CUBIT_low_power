@@ -1,0 +1,214 @@
+// Include logging for this file
+#define INCLUDE_LOG_DEBUG 1
+#include "src/log.h"
+
+#include "app.h"
+
+#include "src/ultrasonic.h"
+#include "em_device.h"
+#include "em_cmu.h"
+#include "em_emu.h"
+#include "em_gpio.h"
+#include "em_leuart.h"
+#include "em_chip.h"
+#include "em_usart.h"
+#include "timers.h"
+
+
+// Size of the buffer for received data
+#define BUFLEN  80
+
+// Receive data buffer
+uint8_t buffer[BUFLEN];
+
+// Current position ins buffer
+uint32_t inpos = 0;
+uint32_t outpos = 0;
+
+// True while receiving data (waiting for CR or BUFLEN characters)
+bool receive = true;
+
+//static char txBuffer[RX_BUFFER_SIZE]; // Software transmit buffer
+
+/**************************************************************************//**
+ * @brief
+ *    Initialize the GPIO pins for the LEUART module
+ *****************************************************************************/
+void initGpio(void)
+{
+  timerWaitUs_polled(1000000);
+  // GPIO clock
+  CMU_ClockEnable(cmuClock_GPIO, true);
+
+  // Initialize LEUART0 TX and RX pins
+//  GPIO_PinModeSet(gpioPortA, 3, gpioModePushPull, 1); // TX
+  GPIO_PinModeSet(gpioPortA, 5, gpioModeInput, 0);    // RX
+
+  //PA2: RX US1_RX #1
+  //PA3: TX US1_TX #3
+
+//  // Configure VCOM transmit pin to board controller as an output
+//  GPIO_PinModeSet(BSP_BCC_TXPORT, BSP_BCC_TXPIN, gpioModePushPull, 1);
+//
+//  // Configure VCOM reeive pin from board controller as an input
+//  GPIO_PinModeSet(BSP_BCC_RXPORT, BSP_BCC_RXPIN, gpioModeInput, 0);
+//
+//  // Enable VCOM connection to board controller
+//  GPIO_PinModeSet(BSP_BCC_ENABLE_PORT, BSP_BCC_ENABLE_PIN, gpioModePushPull, 1);
+}
+
+/**************************************************************************//**
+ * @brief
+ *    Initialize the LEUART module
+ *****************************************************************************/
+void initUsart2(void)
+{
+
+  //PA2: RX US1_RX #1
+    //PA3: TX US1_TX #3
+
+  //PA5: RX US2_RX #31
+
+  // Enable clocks for LEUART0
+  CMU_ClockEnable(cmuClock_USART2, true);
+//  CMU_ClockDivSet(cmuClock_USART1, cmuClkDiv_1); // Don't prescale LEUART clock
+
+  //Initialize the USART1 module
+
+  USART_InitAsync_TypeDef init = {                                                                   \
+      usartEnable,           /* Enable RX/TX when initialization is complete. */                     \
+      0,                     /* Use current configured reference clock for configuring baud rate. */ \
+      9600,                /* 9600 bits/s. */                                                    \
+      usartOVS4,            /* 16x oversampling. */                                                 \
+      usartDatabits8,        /* 8 data bits. */                                                      \
+      usartNoParity,         /* No parity. */                                                        \
+      usartStopbits1,        /* 1 stop bit. */                                                       \
+      false,                 /* Do not disable majority vote. */                                     \
+      false,                 /* Not USART PRS input mode. */                                         \
+      0,                     /* PRS channel 0. */                                                    \
+      false,                 /* Auto CS functionality enable/disable switch */                       \
+      0,                     /* Auto CS Hold cycles */                                               \
+      0,                     /* Auto CS Setup cycles */                                              \
+      usartHwFlowControlNone /* No HW flow control */                                                \
+    };
+
+
+
+  // Configure and enable USART1
+  USART_InitAsync(USART2, &init);
+
+  // Enable NVIC USART sources
+  NVIC_ClearPendingIRQ(USART2_RX_IRQn);
+  NVIC_EnableIRQ(USART2_RX_IRQn);
+//  NVIC_ClearPendingIRQ(USART2_TX_IRQn);
+//  NVIC_EnableIRQ(USART2_TX_IRQn);
+
+  // Enable RX and TX for USART1 VCOM connection
+  USART2->ROUTELOC0 = /*USART_ROUTELOC0_TXLOC_LOC3 | */USART_ROUTELOC0_RXLOC_LOC31;
+  USART2->ROUTEPEN |= USART_ROUTEPEN_RXPEN/* | USART_ROUTEPEN_TXPEN*/;
+  USART2->CTRL |= USART_CTRL_RXINV;
+
+  USART_IntEnable(USART2, USART_IEN_RXDATAV);
+  LOG_INFO("Finished setting up usart2\n\r");
+
+
+  /*
+   *
+   *
+
+  // Default asynchronous initializer (115.2 Kbps, 8N1, no flow control)
+  USART_InitAsync_TypeDef init = USART_INITASYNC_DEFAULT;
+
+  // Configure and enable USART0
+  USART_InitAsync(USART0, &init);
+
+  // Enable NVIC USART sources
+  NVIC_ClearPendingIRQ(USART0_RX_IRQn);
+  NVIC_EnableIRQ(USART0_RX_IRQn);
+  NVIC_ClearPendingIRQ(USART0_TX_IRQn);
+  NVIC_EnableIRQ(USART0_TX_IRQn);
+
+  // Enable RX and TX for USART0 VCOM connection
+  USART0->ROUTELOC0 = BSP_BCC_RX_LOCATION | BSP_BCC_TX_LOCATION;
+  USART0->ROUTEPEN |= USART_ROUTEPEN_RXPEN | USART_ROUTEPEN_TXPEN;
+   */
+}
+
+
+/*----------------------------------------------------------------------------
+ * Standard system I/O function
+ ----------------------------------------------------------------------------*/
+int get_received_char(void)
+{
+  int c;
+  uint32_t masking_state;
+  //returns -1 to indicate that no new char has received
+  if(cbfifo_length(&cbfifo_receive) < 1)
+  {
+    return -1;
+  }
+  else
+  {
+    //Entering critical section
+    masking_state = __get_PRIMASK();
+    __disable_irq();
+    cbfifo_dequeue(&cbfifo_receive, &c, sizeof(c));
+    __set_PRIMASK(masking_state);
+    return c;
+  }
+}
+
+
+/**************************************************************************//**
+ * @brief
+ *    Main function
+ *
+ * @details
+ *    Initialize the GPIO and LEUART modules. Send a welcome message over the TX
+ *    pin. After the RX handler tells us that we have data, start
+ *    processing the received data. Start by disabling RX and TX interrupts so
+ *    that the data we received in rxBuffer does not get overwritten by one of
+ *    the handlers before we read it. Copy the data in rxBuffer into the
+ *    txBuffer and then trigger a TX interrupt to echo it out over the TX pin.
+ *    If there is no data availabe, go into EM2 until an RX or TX interrupt
+ *    wakes up the CPU.
+ *****************************************************************************/
+/*int main(void)
+{
+  // Chip errata
+  CHIP_Init();
+
+  // Init DCDC regulator with kit specific parameters
+  EMU_DCDCInit_TypeDef dcdcInit = EMU_DCDCINIT_DEFAULT;
+  EMU_DCDCInit(&dcdcInit);
+
+  // Initialization
+  initGpio();
+  initLeuart();
+
+  // Print the welcome message
+  char welcomeString[] = "LEUART echo code example\r\n";
+//  for (uint32_t i = 0 ; welcomeString[i] != 0; i++) {
+//    txBuffer[i] = welcomeString[i];
+//  }
+//  LEUART_IntSet(LEUART0, LEUART_IFS_TXC);
+
+  uint32_t i;
+  while (1) {
+
+    // When notified by the RX handler, start processing the received data
+    if (rxDataReady) {
+      LEUART_IntDisable(LEUART0, LEUART_IEN_RXDATAV); // Disable interrupts
+//      for (i = 0; rxBuffer[i] != 0; i++) {
+//        txBuffer[i] = rxBuffer[i]; // Copy rxBuffer into txBuffer
+//      }
+//      txBuffer[i] = '\0';
+      rxDataReady = 0; // Indicate that we need new data
+      LEUART_IntEnable(LEUART0, LEUART_IEN_RXDATAV); // Re-enable interrupts
+      //LEUART_IntSet(LEUART0, LEUART_IFS_TXC);
+    }
+
+    // Wait for incoming data in EM2 to save energy
+    EMU_EnterEM2(false);
+  }
+}*/

@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<session version="1.0">
+<refactoring comment="Rename resource &apos;source&apos; to &apos;magnetic_encoder&apos;" description="Rename resource &apos;source&apos;" flags="7" id="org.eclipse.ltk.core.refactoring.rename.resource" input="/source" name="magnetic_encoder" stamp="1647371137935" updateReferences="true"/>
+</session>
